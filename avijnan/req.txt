@@ -1,3 +1,12 @@
 speechrecognition
 pyttsx3
 pyaudio
+torch
+git+https://github.com/openai/whisper.git  //visit the repo link for installation instructions
+sounddevice
+numpy
+scipy  
+
+
+
+Author:AvijnanPurkait
