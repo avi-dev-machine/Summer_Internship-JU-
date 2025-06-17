@@ -1,39 +1,14 @@
-#!/usr/bin/env python3
+
 """
 ==============================================================================
                     DESKTOP GUI ASSISTANT WITH VOICE COMMANDS
 ==============================================================================
 
 A complete terminal-like desktop assistant with voice recognition and TTS.
-
-FILE STRUCTURE (Single .py file):
-├── Imports & Dependencies
-├── VoiceAssistant Class
-│   ├── __init__() - Initialize application
-│   ├── GUI Setup Methods
-│   │   ├── setup_window() - Configure main window
-│   │   ├── setup_widgets() - Create UI components
-│   │   └── setup_voice_components() - Initialize speech systems
-│   ├── Communication Methods
-│   │   ├── setup_message_queue() - Thread-safe messaging
-│   │   ├── process_queue() - Handle background updates
-│   │   ├── add_terminal_message() - Display messages
-│   │   └── speak_text() - Text-to-speech functions
-│   ├── Input Handlers
-│   │   ├── on_text_command() - Handle typed commands
-│   │   ├── on_voice_command() - Handle voice button
-│   │   └── listen_for_voice() - Voice recognition thread
-│   ├── Command Processor
-│   │   ├── process_command() - Main command router
-│   │   └── execute_command() - Command implementations
-│   └── System Operations
-│       ├── File operations (read, list, navigate)
-│       ├── System commands (notepad, calculator, etc.)
-│       └── Utility functions (help, system info)
-└── main() - Application entry point
+Modified to use local Whisper speech recognition instead of Google Speech API.
 
 REQUIRED PACKAGES:
-pip install speechrecognition pyttsx3 pyaudio
+pip install pyttsx3 openai-whisper sounddevice numpy
 
 AUTHOR: AvijnanPurkait
 ==============================================================================
@@ -48,9 +23,9 @@ import os
 import subprocess
 import platform
 import datetime
-import speech_recognition as sr
 import pyttsx3
 import time
+from speech.speech import get_speech_input
 
 
 # ============================ MAIN CLASS ===================================
@@ -60,7 +35,7 @@ class VoiceAssistant:
     
     Architecture:
     - GUI runs on main thread
-    - Voice recognition runs on background threads
+    - Voice recognition runs on background threads using Whisper
     - TTS runs on separate threads to avoid blocking
     - Message queue ensures thread-safe GUI updates
     """
@@ -166,17 +141,9 @@ class VoiceAssistant:
     # ========================= VOICE SETUP ==================================
     
     def setup_voice_components(self):
-        """Initialize speech recognition and text-to-speech"""
+        """Initialize text-to-speech (speech recognition handled by speech.py)"""
         try:
-            # Initialize speech recognition
-            self.recognizer = sr.Recognizer()
-            self.microphone = sr.Microphone()
-            
-            # Adjust for ambient noise
-            with self.microphone as source:
-                self.recognizer.adjust_for_ambient_noise(source, duration=1)
-            
-            # Initialize text-to-speech
+            # Initialize text-to-speech only
             self.tts_engine = pyttsx3.init()
             
             # Configure TTS settings
@@ -285,34 +252,29 @@ class VoiceAssistant:
             thread.start()
     
     def listen_for_voice(self):
-        """Listen for voice input in a separate thread"""
+        """Listen for voice input using Whisper (speech.py module)"""
         self.listening = True
         self.message_queue.put(("status", "Listening... Speak now!"))
         self.voice_button.config(state="disabled")
         
         try:
-            with self.microphone as source:
-                # Listen for audio
-                audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=10)
+            # Use your speech.py module instead of speech_recognition
+            self.message_queue.put(("status", "Recording... (5 seconds)"))
             
-            self.message_queue.put(("status", "Processing speech..."))
+            # Get speech input using your module
+            command = get_speech_input(duration=5.0, model="base")
             
-            # Recognize speech
-            try:
-                command = self.recognizer.recognize_google(audio)
+            if command and command.strip():
                 self.message_queue.put(("terminal", ("USER", f"[Voice] {command}")))
                 self.process_command(command, "voice")
-            except sr.UnknownValueError:
-                self.message_queue.put(("terminal", ("ERROR", "Could not understand audio")))
-                self.message_queue.put(("speak", "Sorry, I couldn't understand what you said."))
-            except sr.RequestError as e:
-                self.message_queue.put(("terminal", ("ERROR", f"Speech recognition error: {e}")))
-                self.message_queue.put(("speak", "Speech recognition service is unavailable."))
-        
-        except sr.WaitTimeoutError:
-            self.message_queue.put(("terminal", ("SYSTEM", "Voice input timeout")))
+            else:
+                self.message_queue.put(("terminal", ("ERROR", "No speech detected or empty result")))
+                self.message_queue.put(("speak", "I didn't hear anything. Please try again."))
+                
         except Exception as e:
-            self.message_queue.put(("terminal", ("ERROR", f"Voice input error: {str(e)}")))
+            error_msg = f"Voice recognition error: {str(e)}"
+            self.message_queue.put(("terminal", ("ERROR", error_msg)))
+            self.message_queue.put(("speak", "Sorry, there was an error with voice recognition."))
         
         finally:
             self.listening = False
@@ -587,12 +549,13 @@ def main():
     """
     # Check for required packages
     try:
-        import speech_recognition
         import pyttsx3
+        from speech.speech import get_speech_input
     except ImportError as e:
         print(f"Missing required package: {e}")
         print("Please install required packages:")
-        print("pip install speechrecognition pyttsx3 pyaudio")
+        print("pip install pyttsx3 openai-whisper sounddevice numpy")
+        print("Make sure speech/speech.py module is available")
         return
     
     # Create and run the application
