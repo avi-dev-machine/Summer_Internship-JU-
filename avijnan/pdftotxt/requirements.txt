@@ -1,0 +1,10 @@
+pymupdf
+pytesseract
+Pillow
+opencv-python
+pdf2image
+python-docx
+langdetect
+numpy
+# For GUI (optional, included in stdlib for Windows)
+# tkinter
